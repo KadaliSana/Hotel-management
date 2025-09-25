@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import "./home.css"
 
 const Home = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -11,7 +12,7 @@ const Home = () => {
     <div className="home">
       <header className="hero">
         <div className="hero-content">
-          <h1>Welcome to Luxury Hotels</h1>
+          <h1>Welcome to SuiteFlow</h1>
           <p>Experience unparalleled comfort and elegance</p>
           <a href="/bookings" className="cta-button">Book Now</a>
         </div>

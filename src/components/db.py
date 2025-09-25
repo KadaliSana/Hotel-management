@@ -51,8 +51,7 @@ def initialize_db():
             FOREIGN KEY (service_id) REFERENCES services (id)
         )
     ''')
-    
-    # Insert some default services
+
     default_services = [
         ('Haircut', 'Basic haircut service', 30.0),
         ('Hair Coloring', 'Professional hair coloring', 75.0),

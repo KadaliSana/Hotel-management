@@ -1,0 +1,10 @@
+.features {
+ padding: 2%;
+ border-radius: 5%;
+}
+
+nav.transparent {
+    background-color: transparent;
+    box-shadow: none;
+}
+
