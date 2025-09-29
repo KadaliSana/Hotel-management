@@ -1,47 +1,47 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React,  { useState } from 'react';
+import { useAuth } from '../App'; // 1. Import the useAuth hook
 
+// 2. The component no longer accepts any props
+const Login = () => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    
+    // 3. Get the handleLogin function directly from the AuthContext
+    const { handleLogin } = useAuth();
 
-const Login = ({handleLogin}) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const navigate = useNavigate();
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        // 4. Call the function from the context
+        handleLogin(email, password);
+    };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // Here you would typically handle the login logic, like sending data to an API
-    handleLogin(email,password);
-    navigate('/bookings');
-    // Reset form fields after submission
-    setEmail('');
-    setPassword('');
-  };
-
-  return (
-    <div className="login">
-      <div className="login-form">
-        <h2>Login</h2>
-        <form id="loginForm" onSubmit={handleSubmit}>
-          <input 
-            type="email" 
-            placeholder="Email" 
-            value={email} 
-            onChange={(e) => setEmail(e.target.value)} 
-            required 
-          />
-          <input 
-            type="password" 
-            placeholder="Password" 
-            value={password} 
-            onChange={(e) => setPassword(e.target.value)} 
-            required 
-          />
-          <button type="submit">Login</button>
-        </form>
-        <p>Don't have an account? <a href="/signup">Sign up</a></p>
-      </div>
-    </div>
-  );
+    return (
+        <div className="form-container">
+            <form onSubmit={handleSubmit}>
+                <h2>Login</h2>
+                <div className="form-group">
+                    <label>Email</label>
+                    <input 
+                        type="email" 
+                        value={email} 
+                        onChange={(e) => setEmail(e.target.value)} 
+                        required 
+                    />
+                </div>
+                <div className="form-group">
+                    <label>Password</label>
+                    <input 
+                        type="password" 
+                        value={password} 
+                        onChange={(e) => setPassword(e.target.value)} 
+                        required 
+                    />
+                </div>
+                <button type="submit" className="btn">Login</button>
+            </form>
+        </div>
+    );
 };
 
 export default Login;
+

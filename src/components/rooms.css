@@ -1,0 +1,145 @@
+.rooms-staff-page {
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.management-section {
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  padding: 2rem;
+  margin-bottom: 2.5rem;
+}
+
+.management-section h2 {
+  margin-top: 0;
+  border-bottom: 2px solid #f0f0f0;
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  color: #333;
+}
+
+/* Room Grid Styling */
+.room-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.room-card {
+  border-radius: 8px;
+  padding: 1.5rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border-left: 5px solid;
+}
+
+.room-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+.room-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.room-card-header h3 {
+  margin: 0;
+  color: #333;
+}
+
+.room-type {
+  background-color: #e9ecef;
+  color: #495057;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 0.25rem 0.6rem;
+  border-radius: 12px;
+}
+
+.room-price {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #555;
+  margin: 1rem 0;
+}
+
+.room-status-control {
+  margin-top: 1rem;
+}
+
+.room-status-control label {
+  margin-right: 0.5rem;
+  font-weight: 500;
+  color: #666;
+}
+
+.status-select {
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #ced4da;
+  width: 100%;
+}
+
+/* Room Status Colors */
+.room-card.status-available { border-left-color: #28a745; background-color: #f0fff4; }
+.room-card.status-occupied { border-left-color: #dc3545; background-color: #fff5f5; }
+.room-card.status-maintenance { border-left-color: #ffc107; background-color: #fffbec; }
+
+/* Staff Section Styling */
+.staff-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.add-staff-form form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.add-staff-form input {
+  padding: 0.75rem;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.add-staff-form button {
+  padding: 0.75rem;
+  border: none;
+  background-color: #007bff;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.2s;
+}
+
+.add-staff-form button:hover {
+  background-color: #0056b3;
+}
+
+.staff-list ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.staff-list li {
+  background-color: #f8f9fa;
+  padding: 1rem;
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+  border-left: 3px solid #007bff;
+}
+
+@media (max-width: 768px) {
+  .staff-content {
+    grid-template-columns: 1fr;
+  }
+}

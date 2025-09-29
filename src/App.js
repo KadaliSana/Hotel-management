@@ -1,185 +1,242 @@
 import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
-import { BrowserRouter as Router, Route, Routes, Navigate, useNavigate, useLocation, NavLink, Outlet } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useNavigate, useLocation, NavLink } from 'react-router-dom';
 import Home from './components/Home';
 import Login from './components/Login';
 import Signup from './components/Signup';
 import Bookings from './components/Bookings';
 import Services from './components/Services';
+import Rooms from './components/Rooms';
 import Analytics from './components/Analytics';
+import './App.css';
 
-// API base URL
 const API_BASE_URL = 'http://localhost:8000';
 
-// Create Auth Context
-const AuthContext = createContext();
+const AuthContext = createContext(null);
 
-
+/**
+ * AuthProvider: This is the central component for managing all application state,
+ * now using Basic Authentication.
+ */
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [credentials, setCredentials] = useState(null);
+  // State is now for credentials (base64 string) instead of a token
+  const [credentials, setCredentials] = useState(() => localStorage.getItem('credentials'));
+  const [services, setServices] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [rooms, setRooms] = useState([]);
+  const [staff, setStaff] = useState([]);
+  const navigate = useNavigate();
 
-  const login = useCallback((userCredentials, userData) => {
-    setCredentials(userCredentials);
-    setUser(userData);
-    localStorage.setItem('credentials', userCredentials);
-    localStorage.setItem('user', JSON.stringify(userData));
-  }, []);
-
+  // Centralized logout function - now clears credentials
   const logout = useCallback(() => {
     setCredentials(null);
     setUser(null);
+    setBookings([]);
+    setRooms([]);
+    setStaff([]);
     localStorage.removeItem('credentials');
     localStorage.removeItem('user');
-  }, []);
+    navigate('/');
+  }, [navigate]);
 
-  return (
-    <AuthContext.Provider value={{ user, credentials, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  // Centralized API fetch utility that uses Basic Authentication
+  const apiFetch = useCallback(async (endpoint, options = {}) => {
+    const headers = {
+        'Content-Type': 'application/json',
+        ...options.headers,
+    };
+    // Add the Basic Auth header if credentials exist
+    if (credentials) {
+        headers['Authorization'] = `Basic ${credentials}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        logout(); // Automatically log out if credentials are invalid
+      }
+      const errData = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(errData.detail || `Error: ${response.status}`);
+    }
+    return response.status === 204 ? null : await response.json();
+  }, [credentials, logout]);
+
+  // This effect runs on initial load to restore the session from localStorage
+  useEffect(() => {
+    const bootstrapAppData = async () => {
+      // Public data is always fetched
+      try {
+        // Use fetch directly for public data to avoid auth logic complications
+        const servicesData = await fetch(`${API_BASE_URL}/services/`).then(res => res.json());
+        setServices(servicesData);
+      } catch (error) {
+        console.error("Failed to fetch services:", error);
+      }
+      
+      // If credentials exist, validate them by fetching user data
+      const storedUser = localStorage.getItem('user');
+      if (credentials && storedUser) {
+        setUser(JSON.parse(storedUser));
+        try {
+          // Fetch all protected data
+          const [bookingsData, roomsData, staffData] = await Promise.all([
+            apiFetch('/bookings/'),
+            apiFetch('/rooms/'),
+            apiFetch('/staff/'),
+          ]);
+          setBookings(bookingsData);
+          setRooms(roomsData);
+          setStaff(staffData);
+        } catch (error) {
+          console.error("Session expired or invalid:", error);
+          logout(); // Credentials might be stale, so log out
+        }
+      }
+    };
+    bootstrapAppData();
+  }, [credentials, apiFetch, logout]);
+
+  // --- Handler Functions ---
+
+  const handleLogin = async (email, password) => {
+    try {
+      const base64Credentials = btoa(`${email}:${password}`);
+      // The POST to /token verifies credentials and returns user data
+      const userData = await fetch(`${API_BASE_URL}/token`, {
+        method: 'POST',
+        headers: { 'Authorization': `Basic ${base64Credentials}` },
+      }).then(res => {
+        if (!res.ok) throw new Error('Invalid credentials');
+        return res.json();
+      });
+
+      // Store credentials and user data on successful login
+      localStorage.setItem('credentials', base64Credentials);
+      localStorage.setItem('user', JSON.stringify(userData));
+      setCredentials(base64Credentials);
+      setUser(userData);
+      navigate('/bookings');
+    } catch (err) {
+      alert('Login failed: ' + err.message);
+    }
+  };
+
+  const handleSignup = async (email, password, fullName) => {
+    try {
+      // Signup doesn't require auth, so use fetch directly
+      await fetch(`${API_BASE_URL}/users/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, full_name: fullName }),
+      });
+      alert('Account created! Please log in.');
+      navigate('/login');
+    } catch (err) {
+      alert('Signup failed: ' + err.message);
+    }
+  };
+
+  const handleBooking = async (bookingData) => {
+    try {
+      await apiFetch('/bookings/', { method: 'POST', body: JSON.stringify(bookingData) });
+      const updatedBookings = await apiFetch('/bookings/');
+      setBookings(updatedBookings);
+      alert('Booking successful!');
+    } catch (err) {
+      alert('Booking failed: ' + err.message);
+    }
+  };
+
+  const handleUpdateBookingStatus = async (bookingId, status) => {
+    try {
+      await apiFetch(`/bookings/${bookingId}`, { method: 'PUT', body: JSON.stringify({ status }) });
+      setBookings(bookings.map(b => b.id === bookingId ? { ...b, status } : b));
+      alert('Booking status updated!');
+    } catch (err) {
+      alert('Failed to update status: ' + err.message);
+    }
+  };
+
+  const handleUpdateRoomStatus = async (roomId, status) => {
+    try {
+      await apiFetch(`/rooms/${roomId}/status`, { method: 'PUT', body: JSON.stringify({ status }) });
+      setRooms(rooms.map(r => r.id === roomId ? { ...r, status } : r));
+    } catch (err) {
+      alert('Failed to update room status: ' + err.message);
+    }
+  };
+
+  const handleAddStaff = async (fullName, specialty) => {
+    try {
+      const newStaffMember = await apiFetch('/staff/', {
+        method: 'POST',
+        body: JSON.stringify({ full_name: fullName, specialty }),
+      });
+      setStaff([...staff, newStaffMember]);
+    } catch (err) {
+      alert('Failed to add staff member: ' + err.message);
+    }
+  };
+  
+  // The complete value provided by the AuthContext
+  const value = {
+    user,
+    credentials,
+    isAuthenticated: !!user, // App is authenticated if the user object exists
+    services,
+    bookings,
+    rooms,
+    staff,
+    logout,
+    handleLogin,
+    handleSignup,
+    handleBooking,
+    handleUpdateBookingStatus,
+    handleUpdateRoomStatus,
+    handleAddStaff,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
+// Custom hook to easily access the context
 export const useAuth = () => useContext(AuthContext);
 
-// AppWrapper is needed because App needs to use useLocation, which must be inside a Router
-function AppWrapper() {
-  return (
-      <App />
-  );
-}
-
+// The main App component
 function App() {
-  const [navTransparent, setNavTransparent] = useState(true);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
-
+  const [navTransparent, setNavTransparent] = useState(location.pathname === '/');
+  const { user, isAuthenticated, logout } = useAuth();
+  
   useEffect(() => {
-    // Hide nav transparency logic if not on the home page
     if (location.pathname !== '/') {
-        setNavTransparent(false);
-        return;
+      setNavTransparent(false);
+      return;
     }
-
-    // Set initial state based on scroll position
-    setNavTransparent(window.scrollY < 100);
-
-    const handleScroll = () => {
-        if (window.scrollY > 100) {
-            setNavTransparent(false);
-        } else {
-            setNavTransparent(true);
-        }
-    };
-    
+    const handleScroll = () => setNavTransparent(window.scrollY < 100);
     window.addEventListener('scroll', handleScroll);
+    handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
   }, [location.pathname]);
-  
-  const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen);
-  };
 
-  // Styles needed for the navigation to work
-  const navStyles = `
-    .nav-bar {
-      top: 0;
-      left: 0;
-      width: 100%;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1rem 2rem;
-      z-index: 1000;
-      transition: background-color 0.5s ease;
-    }
-    .nav-bar.transparent {
-      background-color: transparent;
-    }
-    .nav-bar:not(.transparent) {
-      background-color: #111827; /* Dark background for scrolled nav */
-      color: white;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    .logo a {
-        font-size: 1.5rem;
-        font-weight: bold;
-        color: white;
-        text-decoration: none;
-    }
-    .nav-links {
-        display: flex;
-        gap: 1.5rem;
-        align-items: center;
-    }
-     .nav-links a { color: white; text-decoration: none; }
-     .logout-btn { background: #2563eb; color: white; border: none; padding: 0.7rem 1rem; border-radius: 0.5rem; cursor: pointer; }
-     .menu-toggle { display: none; } /* Add responsive styles if needed */
-  `;
-
-  return (
-    <AuthProvider>
-      <style>{navStyles}</style>
-      <AppContent 
-        navTransparent={location.pathname === '/' && navTransparent} 
-        isMenuOpen={isMenuOpen} 
-        toggleMenu={toggleMenu} 
-      />
-    </AuthProvider>
-  );
-}
-
-function AppContent({ navTransparent, isMenuOpen, toggleMenu }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { user, credentials, login, logout } = useAuth();
-  const [services, setServices] = useState([]);
-  const [bookings, setBookings] = useState([]);
-  
-  useEffect(() => {
-    const storedCredentials = localStorage.getItem('credentials');
-    const storedUser = localStorage.getItem('user');
-    if (storedCredentials && storedUser) {
-      login(storedCredentials, JSON.parse(storedUser));
-    }
-  }, [login]);
-  
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
-  
-  // Placeholder API call handlers
-  const handleLogin = async (email, password) => {
-    console.log("Logging in with:", email);
-    const base64Credentials = btoa(`${email}:${password}`);
-    login(base64Credentials, { email, isAdmin: email.includes('admin') }); // Mock login
-    navigate('/bookings');
-  };
-  const handleSignup = async (email, password, fullName) => {
-    console.log("Signing up:", email, fullName);
-    alert('Account created! Please log in.');
-    navigate('/login');
-  };
-  
   return (
     <div>
       <nav className={`nav-bar ${navTransparent ? 'transparent' : ''}`}>
-        <div className="logo">
-          <NavLink to="/">SuiteFlow</NavLink>
-        </div>
-        <div className={`menu-toggle ${isMenuOpen ? 'active' : ''}`} onClick={toggleMenu}>
-          <div className="hamburger"></div>
-        </div>
-        <ul className={`nav-links ${isMenuOpen ? 'active' : ''}`}>
+        <div className="logo"><NavLink to="/">SuiteFlow</NavLink></div>
+        <ul className="nav-links">
           <pa><NavLink to="/">Home</NavLink></pa>
-          <pa><NavLink to="/services">Services</NavLink></pa>
-          {user ? (
+          {isAuthenticated ? (
             <>
               <pa><NavLink to="/bookings">My Bookings</NavLink></pa>
-              {user.isAdmin && (
-                <pa><NavLink to="/analytics">Analytics</NavLink></pa>
+              {user?.isAdmin && (
+                <>
+                  <pa><NavLink to="/analytics">Analytics</NavLink></pa>
+                  <pa><NavLink to="/services">Services</NavLink></pa>
+                  <pa><NavLink to="/rooms">Rooms & Staff</NavLink></pa>
+                </>
               )}
-              <pa><button className="logout-btn" onClick={handleLogout}>Logout</button></pa>
+              <pa><button className="logout-btn" onClick={logout}>Logout</button></pa>
             </>
           ) : (
             <>
@@ -190,39 +247,61 @@ function AppContent({ navTransparent, isMenuOpen, toggleMenu }) {
         </ul>
       </nav>
       
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login handleLogin={handleLogin} />} />
-        <Route path="/signup" element={<Signup handleSignup={handleSignup} />} />
-        <Route 
-          path="/bookings" 
-          element={<ProtectedRoute><Bookings/></ProtectedRoute>} 
-        />
-        <Route path="/services" element={<Services />} />
-        <Route 
-          path="/analytics" 
-          element={<ProtectedRoute allowedRoles={['admin']}><Analytics /></ProtectedRoute>} 
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <main className="main-content">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/services" element={
+            <ProtectedRoute isAdminOnly={true}>
+              <Services />
+            </ProtectedRoute>
+            } />
+          <Route path="/bookings" element={
+            <ProtectedRoute>
+              <Bookings />
+            </ProtectedRoute>
+          }/>
+          <Route path="/analytics" element={
+            <ProtectedRoute isAdminOnly={true}>
+              <Analytics />
+            </ProtectedRoute>
+          }/>
+          <Route path="/rooms" element={
+            <ProtectedRoute isAdminOnly={true}>
+              <Rooms />
+            </ProtectedRoute>
+          }/>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
     </div>
   );
 }
 
-const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { user } = useAuth();
+// ProtectedRoute component
+const ProtectedRoute = ({ children, isAdminOnly = false }) => {
+  const { isAuthenticated, user } = useAuth();
   const location = useLocation();
 
-  if (!user) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
-
-  if (allowedRoles && !allowedRoles.includes(user.isAdmin ? 'admin' : 'user')) {
-    const fallbackPath = user.isAdmin ? '/analytics' : '/bookings';
-    return <Navigate to={fallbackPath} replace />;
+  if (isAdminOnly && !user?.isAdmin) {
+    return <Navigate to="/bookings" replace />;
   }
   
-  return children || <Outlet />;
+  return children;
 };
 
+// The AppWrapper is the root component
+function AppWrapper() {
+  return (
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+  );
+}
+
 export default AppWrapper;
+
